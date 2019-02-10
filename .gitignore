@@ -1,4 +1,4 @@
-auth.json
+Client/auth.json
 *.crt
 *.csr
 *.key

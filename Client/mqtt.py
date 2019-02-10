@@ -14,7 +14,7 @@ class Messenger(object):
     def _load_auth(self):
         decoder = json.decoder.JSONDecoder()
         try:
-            auth_file = decoder.decode(open("../auth.json").read())
+            auth_file = decoder.decode(open("../Client/auth.json").read())
             return auth_file
         except IOError:
             print("No authentication file found, using unencrypted connection")
