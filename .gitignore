@@ -1,4 +1,6 @@
-Client/auth.json
+*.json
 *.crt
 *.csr
 *.key
+*/__pycache__
+*.joblib
