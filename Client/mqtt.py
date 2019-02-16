@@ -17,7 +17,7 @@ class Messenger(object):
 
     def _load_auth(self):
         try:
-            auth_file = json.loads(open("auth.json").read())
+            auth_file = json.loads(open("../credentials/auth.json").read())
             return auth_file
         except IOError:
 

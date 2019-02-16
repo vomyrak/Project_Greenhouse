@@ -10,35 +10,25 @@ from joblib import dump, load
 
 class MiniBatchKMeansTrainer(object):
 
-    def __init__(self, data, n_clusters=8, resolution = 0.02):
+    def __init__(self, batch_size = 1440, n_clusters=8, resolution = 0.02):
         self.plt = plt
         self.resolution = resolution
-        self.data, self.test = self.split(data)
-        self.kmeans = self._load_existing_model(data, n_clusters, np.size(self.data, 0))
+        self.batch_size = batch_size
+        self.kmeans = self._load_existing_model(n_clusters, np.size(self.batch_size, 0))
         self.resolution = resolution
 
-
-
-    def split(self, data):
-        return data[:int(np.size(data, 0) * 0.9), :], data[int(np.size(data, 0) * 0.9):, :] 
-
-    def _load_existing_model(self, data, n_clusters, batch_size):
+    def _load_existing_model(self, n_clusters, batch_size):
         try:
             return load('test.joblib')
         except Exception:
             return MiniBatchKMeans(n_clusters=n_clusters, batch_size=batch_size)
 
-    def partial_fit(self, data = None):
-        if type(data) == None:
-            self.kmeans.partial_fit(self.data)
-        else:
-            self.kmeans.partial_fit(data)
+    def partial_fit(self, data):
+        self.kmeans.partial_fit(data)
+        dump(self.kmeans, 'test.joblib')
             
-    def plot_decision_regions(self,b = None,  test_idx=None):
-        if type(b) == None:
-            X = self.data
-        else:
-            X = b
+    def plot_decision_regions(self, data):
+        X = data
         markers = ('s', 'x', 'o', '^', 'v')
         colors = ('red', 'blue', 'lightgreen', 'gray', 'cyan', 'yellow', 'indigo', 'wheat', 'tan', 'darkcyan',
             'royalblue', 'pink', 'powderblue', 'tomato', 'black', 'orange', 'indigo')
@@ -53,52 +43,37 @@ class MiniBatchKMeansTrainer(object):
         self.plt.contourf(xx1, xx2, Z, alpha=0.4, cmap=cmap)
         self.plt.xlim(xx1.min(), xx1.max())
         self.plt.ylim(xx2.min(), xx2.max())
-        result = self.kmeans.predict(self.test)
+        result = self.kmeans.predict(X)
         for idx, cl in enumerate(np.unique(result)):
-            self.plt.scatter(x=self.test[result==cl,0], y=self.test[result==cl,1], alpha=0.8, c=cmap(idx), marker=markers[idx % 5], label=cl)
+            self.plt.scatter(x=X[result==cl,0], y=X[result==cl,1], alpha=0.8, c=cmap(idx), marker=markers[idx % 5], label=cl)
         plt.show()
 
-    def run_test_cycle(self):
-        a = np.zeros((1440, 2))
-        b = np.zeros((1440, 2))
-        for j in range(2):
-            if not j:
-                a[:, j] = np.random.normal(900, 1.0, (1440))
-            else:
-                a[:, j] = np.random.normal(100, 0.5, (1440))
 
+    def generate_random_data_two_features(self):
+        '''Generate Gaussian random data to acceleration training for demonstration'''
+        data = np.zeros((1440, 2))
         for j in range(2):
             if not j:
-                b[:, j] = np.random.normal(900, 1.0, (1440))
+                data[:, j] = np.random.normal(900, 1.0, (1440))
             else:
-                b[:, j] = np.random.normal(100, 0.5, (1440))
+                data[:, j] = np.random.normal(100, 0.5, (1440))
+        return data
         
+    def run_test_cycle(self):
+        '''Use randomly generated data for training'''
+        a = self.generate_random_data_two_features()
+        b = self.generate_random_data_two_features()
         self.partial_fit(a)
-
         self.plot_decision_regions(b)
-        dump(self.kmeans, 'test.joblib')
+
 
 
 def main():
-    a = np.zeros((1440, 2))
-    b = np.zeros((1440, 2))
 
-    for j in range(2):
-        if not j:
-            a[:, j] = np.random.normal(900, 1.0, (1440))
-        else:
-            a[:, j] = np.random.normal(100, 0.5, (1440))
-
-    for j in range(2):
-        if not j:
-            b[:, j] = np.random.normal(900, 1.0, (1440))
-        else:
-            b[:, j] = np.random.normal(100, 0.5, (1440))
-
-
-    kmeans = MiniBatchKMeansTrainer(a, n_clusters=9, resolution=2)
+    kmeans = MiniBatchKMeansTrainer(n_clusters=9, resolution=2)
+    a = kmeans.generate_random_data_two_features()
+    b = kmeans.generate_random_data_two_features()
     kmeans.partial_fit(a)
-
     c = kmeans.kmeans.predict(b)
     kmeans.plot_decision_regions(b)
     dump(kmeans.kmeans, 'test.joblib')

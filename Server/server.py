@@ -1,15 +1,14 @@
 # For Server
 import sys
 import os
-sys.path.insert(0, "../")
+sys.path.append("../")
 from Client import mqtt
 from threading import Lock, Thread
 import numpy as np
 from sklearn import cluster
-os.chdir("../Client")
 import datetime
 import json
-from dbMananger import DbManager
+from dbManager import DbManager
 from trainer import MiniBatchKMeansTrainer
 from joblib import dump, load
 
@@ -17,20 +16,41 @@ from joblib import dump, load
 
 class Server(object):
     def __init__(self, thresh_file = None, buffer_size = 60, batch_size = 1440, n_clusters = 9):
-        self.buffer_size = buffer_size
-        self.batch_size = batch_size
+
+        # Async lock
+        self.lock = Lock()
+
+        # MQTT client
         self.mqtt = mqtt.Messenger(self.read_input)
-        self.data = np.zeros(shape=(self.batch_size, 4))
-        self.label = np.ndarray(shape=(self.batch_size,), dtype=str)
+
+        # ML Setting
+        self.n_clusters = n_clusters
+        self.kmeans = self._load_existing_model()
+        self.batch_size = batch_size
         self.threshold = self._init_threshold(thresh_file)
         self.row_count = 0
-        self.lock = Lock()
-        self.kmeans = self._load_existing_model()
+
+        # Raw data temp storage
+        self.buffer_size = buffer_size
         self.buffer = np.zeros(shape=(self.buffer_size, 4))
         self.buffer_count = 0
-        self.cur_min = None
-        self.n_clusters = n_clusters
+        self.cur_min = None             # current minute count
+        self.cur_hour = None
+
+        # Average data temp storage
+        self.average = [[], [], [], []]
+
+        # Processed data temp storage
+        self.data = np.zeros(shape=(self.batch_size, 4))
+        self.label = np.ndarray(shape=(self.batch_size,), dtype=str)
+
+        # Database manager
         self.db_manager = DbManager()
+
+        # User setting
+        self.user = "user_1"
+        self.flora = "parimulas"
+
 
     def _init_threshold(self, thresh_file):
         if thresh_file == None:
@@ -46,8 +66,18 @@ class Server(object):
 
 
     def read_input(self, topic, message):
-        if topic != self.mqtt.topic + "/average":
-            self.lock.acquire()
+        if topic == self.mqtt.topic + "/history_request":
+            history = self.db_manager.get_user_history(self.user, self.flora)
+            if history == None:
+                self.mqtt.client.publish(self.mqtt.topic + "/history", "No history")
+            else:
+                hist_message = []
+                for entry in history:
+                    hist_message.append(entry["value"])
+                self.mqtt.client.publish(self.mqtt.topic + "/history", json.dumps(hist_message))
+
+            
+        elif topic == self.mqtt.topic + "/raw_data":
             corrupted_data = False
             try:
                 co2 = message["co2"]
@@ -55,13 +85,14 @@ class Server(object):
                 humidity = message["humidity"]
                 temperature = message["temperature"]
                 time = message["time"]
-
-            finally:
-                self.lock.release()
+            except KeyError:
+                corrupted_data = True
             if not corrupted_data:
                 date_time = datetime.datetime.strptime(message["time"], "%Y-%m-%d %H:%M:%S")
+                
                 if self.cur_min == None:
                     self.cur_min = date_time.minute
+                    self.cur_hour = date_time.hour
                 if self.cur_min == date_time.minute:
                     self.lock.acquire()
                     try:
@@ -76,15 +107,24 @@ class Server(object):
                     try:
                         check_valid = self.last_nonzero(self.buffer, axis = 0, invalid_val = -1)
                         average = self.buffer[:check_valid[0]].mean(axis = 0)
-                        msg_string = {
+                        msg_dict = {
                             "co2": co2,
                             "organic": organic,
                             "humidity": humidity,
                             "temperature": temperature,
                             "time": time
                         }
-                        self.mqtt.client.publish(self.mqtt.topic + "/average", json.dumps(msg_string))
+                        self.average[0].append(co2)
+                        self.average[1].append(organic)
+                        self.average[2].append(humidity)
+                        self.average[3].append(temperature)
+                        self.average.append(msg_dict)
+                        self.mqtt.client.publish(self.mqtt.topic + "/average", json.dumps(msg_dict))
                         self.update_data(average, date_time)
+
+                        # actual_implementation
+                        if self.cur_hour != date_time.hour:
+                           self.write_to_database(date_time)
 
                     except Exception as e:
                         print (e)
@@ -93,6 +133,7 @@ class Server(object):
                         self.buffer_count = 0
                         self.buffer.fill(0)
                         self.cur_min = date_time.minute
+                        self.cur_hour = date_time.hour
                         self.lock.release()
 
                     '''
@@ -102,7 +143,23 @@ class Server(object):
                     thread = Thread(target=self.train)
                     thread.run()
                     
-
+    def write_to_database(self, date_time):
+        try:
+            history = self.db_manager.get_user_history(self.user, self.flora)
+        except Exception:
+            history = []
+        avg = {
+            "co2": sum(self.average[0]) // len(self.average[0]),
+            "organic": sum(self.average[1]) // len(self.average[1]),
+            "humidity": sum(self.average[2]) / len(self.average[2]),
+            "temperature": sum(self.average[3]) / len(self.average[3])
+        }
+        update = {
+            "time": date_time.strftime("'%Y-%m-%d %H"), 
+            "value": avg
+        }
+        history.insert(0, update)
+        self.db_manager.write_user_history(self.user, self.flora, history)
 
     def update_buffer(self, co2, organic, humidity, temperature):
         self.buffer[self.buffer_count, 0] = co2
@@ -134,28 +191,25 @@ class Server(object):
         finally:
             self.lock.release()
         if self.kmeans == None:
-            self.kmeans = MiniBatchKMeansTrainer(raw, n_clusters=self.n_clusters, resolution=2)
-            #self.kmeans.partial_fit_new()
-            #self.kmeans.plot_decision_regions()
-            #dump(self.kmeans.kmeans, 'test.joblib')
-            self.kmeans.run_test_cycle()
-        else:
-            self.kmeans.run_test_cycle()
-
-        #self.kmeans.plot_decision_regions()
-
-
-
-
-
-
-
+            self.kmeans = MiniBatchKMeansTrainer(n_clusters=self.n_clusters,
+                resolution=2, batch_size=self.batch_size)
+        self.kmeans.partial_fit(raw)
+        # self.kmeans.run_test_cycle()          # used for demo only
 
 def main():
     server = Server(batch_size=1440)
-    server.start_server()
+    #server.start_server()
 
+    import random
 
+    for i in range(20):
+        for j in range(100):
+            server.average[0].append(random.randint(400, 600))
+            server.average[1].append(random.randint(0, 100))
+            server.average[2].append(random.uniform(20, 80))
+            server.average[3].append(random.uniform(20, 30))
+        date_time = datetime.datetime.now()
+        server.write_to_database(date_time)
 
 if __name__ == "__main__":
     main()

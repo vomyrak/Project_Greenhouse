@@ -5,7 +5,7 @@ import threading
 class DbManager(object):
     '''Data base manager'''
 
-    def __init__(self, config_file = "dbconfig.json"):
+    def __init__(self, config_file = "../credentials/dbconfig.json"):
         self.client = self._db_init(config_file)
         
     def _db_init(self, config_file):
@@ -35,13 +35,20 @@ class DbManager(object):
         except errors.ServerSelectionTimeoutError as e:
             print(e)
             return -1
-    
 
+    def get_user_history(self, user, flora):
+        '''Get threshold data value of a particular plant from database'''
+        try:
+            user_info = self.client.greenhouse.user.find_one({"user": user})
+            return user_info["history"][flora]
+        except errors.ServerSelectionTimeoutError as e:
+            print(e)
+            return None
 
-def main():
-    dbManager = DbManager()
-    a = 0
-
-
-if __name__ == "__main__":
-    main()
+    def write_user_history(self, user, flora, history):
+        try:
+            self.client.greenhouse.user.find_and_modify({"user": user}, {"history.{}".format(flora): history}, upsert=True)
+            return 0
+        except errors.ServerSelectionTimeoutError as e:
+            print(e)
+            return -1 
