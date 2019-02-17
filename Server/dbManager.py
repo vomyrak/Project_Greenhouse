@@ -47,7 +47,7 @@ class DbManager(object):
 
     def write_user_history(self, user, flora, history):
         try:
-            self.client.greenhouse.user.find_and_modify({"user": user}, {"history.{}".format(flora): history}, upsert=True)
+            self.client.greenhouse.user.find_and_modify({"user": user}, {"$set": {"history.{}".format(flora): history}}, upsert=True)
             return 0
         except errors.ServerSelectionTimeoutError as e:
             print(e)
