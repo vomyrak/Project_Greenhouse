@@ -19,6 +19,15 @@ class DbManager(object):
         except KeyError:
             return None
 
+
+    def get_optimal_setting(self, name):
+        '''Get the optimal threshold setting from the database'''
+        try:
+            return self.client.greenhouse.flora.find_one({"name": name})
+        except errors.ServerSelectionTimeoutError as e:
+            print(e)
+            return None
+
     def get_flora_data(self, name):
         '''Get threshold data value of a particular plant from database'''
         try:
