@@ -10,21 +10,30 @@ class Messenger(object):
         self.host = "m24.cloudmqtt.com"
         self.insecure_port = 18340
         self.ssl_port = 28340
-        self.qos = 0
+        self.qos = 2
         self.handler = method
         self.max_reconnection_num = 5
         self.cur_trial_num = 0
-
-    def _load_auth(self):
+    
+    def _load_auth(self, is_secure = True):
+        """Load authentication json file"""
         try:
-            auth_file = json.loads(open("../credentials/auth.json").read())
-            return auth_file
+            if is_secure:
+                auth_file = json.loads(open("../credentials/auth.json").read())
+                return auth_file
+            
+            else:
+                auth_file = json.loads(open("../credentials/insecure_auth.json").read())
+                return auth_file
+
         except IOError:
 
             return None
 
 
     def client_init(self):
+        """Initialise client setting"""
+
         self.client.on_message = self.on_message
         self.client.on_connect = self.on_connect
         self.client.on_subscribe = self.on_subscribe
@@ -32,7 +41,7 @@ class Messenger(object):
         
         if self.auth == None:
             print("No authentication file found, using unencrypted connection")
-            self.client.connect(self.host, self.insecure_port)
+            self.client_insecure_init()
         else:
             try:
                 self.client.username_pw_set(self.auth["username"], self.auth["password"])
@@ -40,13 +49,28 @@ class Messenger(object):
                 self.client.tls_insecure_set(False)
                 self.client.connect(self.host, self.ssl_port)
             except KeyError:
-                print("Authentication file corrupted, using insecure connection instead")
-                self.client.connect(self.host, self.insecure_port)
+                print("Authentication file corrupted, using insecure connection instead" + 
+                    " with default username and password")
+                self.client_insecure_init()
             
         print("Connection complete")
-        self.client.subscribe(self.topic + "/#", self.qos)
+        self.client.subscribe(self.topic + "/history_request", self.qos)
     
+    def client_insecure_init(self):
+        try:
+            self.auth = self._load_auth(False)
+            self.client.username_pw_set(self.auth["username"], self.auth["password"])
+            self.client.connect(self.host, self.insecure_port)
+        except KeyError:
+            print("Insecure authentication file corrupted, connection failed")
+            exit()
+
     def on_disconnect(self, client, userdata, rc):
+        """
+        Disconnection handler
+        Tries to reconnect after disconnection
+        """
+        
         if rc != 0:
             print("Unexpected disconnection")
             self.cur_trial_num += 1

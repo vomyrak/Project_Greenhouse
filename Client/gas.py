@@ -64,11 +64,6 @@ class CCS811(object):
         for attempt in range(self.max_retrial_num):
             if status_OK == False:
                 try:
-                    #self.bus.write_i2c_block_data(self.address, self.APP_VERIFY, [])
-                    #if self.read_status() & (1 << 4):
-                    #    raise AppVerificationFailureError()
-                    #print("Hardware verification complete")
-
                     self.bus.write_i2c_block_data(self.address, self.APP_START, [])
                     if self.read_status() & 1:
                         raise AppStartupFailureError()

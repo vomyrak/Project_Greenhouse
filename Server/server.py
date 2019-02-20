@@ -49,7 +49,7 @@ class Server(object):
 
         # User setting
         self.user = "user_1"
-        self.flora = "parimulas"
+        self.flora = "carnation"
 
 
     def _init_threshold(self, thresh_file):
@@ -57,6 +57,7 @@ class Server(object):
             return np.zeros(shape=(2, 4))
         else:
             pass
+            
 
     def _load_existing_model(self):
         try:
@@ -71,10 +72,12 @@ class Server(object):
             if history == None:
                 self.mqtt.client.publish(self.mqtt.topic + "/history", "No history")
             else:
-                hist_message = []
-                for entry in history:
-                    hist_message.append(entry["value"])
-                self.mqtt.client.publish(self.mqtt.topic + "/history", json.dumps(hist_message))
+                if len(history) < 20:
+                    for j in range(0, len(history)):
+                        self.mqtt.client.publish(self.mqtt.topic + "/history", json.dumps(history[j]["value"]))
+                else:
+                    for j in range(0, 20):
+                        self.mqtt.client.publish(self.mqtt.topic + "/history", json.dumps(history[j]["value"]))
 
             
         elif topic == self.mqtt.topic + "/raw_data":
@@ -148,15 +151,15 @@ class Server(object):
             history = self.db_manager.get_user_history(self.user, self.flora)
         except Exception:
             history = []
-        avg = {
-            "co2": sum(self.average[0]) // len(self.average[0]),
-            "organic": sum(self.average[1]) // len(self.average[1]),
-            "humidity": sum(self.average[2]) / len(self.average[2]),
-            "temperature": sum(self.average[3]) / len(self.average[3])
+        entry = {
+            "co2": round(sum(self.average[0]) // len(self.average[0]), 0),
+            "organic": round(sum(self.average[1]) // len(self.average[1]), 0),
+            "humidity": round(sum(self.average[2]) / len(self.average[2]), 1),
+            "temperature": round(sum(self.average[3]) / len(self.average[3]), 1),
+            "time": date_time.strftime("%Y-%m-%d %H"), 
         }
         update = {
-            "time": date_time.strftime("'%Y-%m-%d %H"), 
-            "value": avg
+            "value": entry
         }
         history.insert(0, update)
         self.db_manager.write_user_history(self.user, self.flora, history)
@@ -198,18 +201,23 @@ class Server(object):
 
 def main():
     server = Server(batch_size=1440)
-    #server.start_server()
+    server.start_server()
 
+    '''
+    # For test data generation
+    server.flora = "carnation"
     import random
 
-    for i in range(20):
-        for j in range(100):
+    for i in range(40):
+        for j in range(2):
             server.average[0].append(random.randint(400, 600))
             server.average[1].append(random.randint(0, 100))
-            server.average[2].append(random.uniform(20, 80))
-            server.average[3].append(random.uniform(20, 30))
+            server.average[2].append(random.uniform(40, 90))
+            server.average[3].append(random.uniform(5, 30))
         date_time = datetime.datetime.now()
         server.write_to_database(date_time)
+    '''
+    
 
 if __name__ == "__main__":
     main()

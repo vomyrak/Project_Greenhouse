@@ -15,6 +15,10 @@ class MonitorSystem(object):
         self.controller = Controller()
     
     def run(self):
+        """
+        Infinite loop to try to read data from sensors
+        Time is managed by CCS811 as it gives a reading every 1 sec
+        """
         self.gas_sensor.sensor_init()
         self.messenger.client_init()
         iteration = 0
@@ -39,12 +43,13 @@ class MonitorSystem(object):
                 print("Relative Humidity is: {} percent".format(humidity))
                 print("Temperature is: {} degrees Celsius".format(temperature))
                 print("\n")
-                msg_string = {}
-                msg_string["co2"] = co2
-                msg_string["organic"] = organic
-                msg_string["humidity"] = humidity
-                msg_string["temperature"] = temperature
-                msg_string["time"] = time
+                msg_string = {
+                    "co2": co2,
+                    "organic": organic,
+                    "humidity": humidity,
+                    "temperature": temperature,
+                    "time": time
+                }
                 self.messenger.client.publish(self.messenger.topic + "/raw_data", json.dumps(msg_string))
             except ValueError as e:
                 print(e)
