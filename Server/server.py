@@ -243,7 +243,6 @@ class Server(object):
             self.lock.release()
         self.kmeans.partial_fit(raw)
         self.mean_setting = self._find_average_setting()
-        # self.kmeans.run_test_cycle()          # used for demo only
 
 
 
@@ -251,20 +250,6 @@ class Server(object):
 def main():
     server = Server(batch_size=1440)
     server.start_server()
-    '''
-    # For test data generation
-    server.flora = "parimulas"
-    import random
-    date_time = datetime.datetime(year = 2018, month = 7, day = 23, hour = 15)
-    for i in range(40):
-        for j in range(2):
-            server.average[0].append(random.randint(400, 600))
-            server.average[1].append(random.randint(0, 100))
-            server.average[2].append(random.uniform(40, 70))
-            server.average[3].append(random.uniform(-2, 6))
-        date_time = date_time - datetime.timedelta(hours = 1)
-        server.write_to_database(date_time)
-    '''
 
 if __name__ == "__main__":
     main()
