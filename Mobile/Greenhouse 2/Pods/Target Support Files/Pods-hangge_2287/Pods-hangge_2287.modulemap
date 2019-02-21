@@ -1,0 +1,6 @@
+framework module Pods_hangge_2287 {
+  umbrella header "Pods-hangge_2287-umbrella.h"
+
+  export *
+  module * { export * }
+}
