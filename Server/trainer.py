@@ -10,11 +10,11 @@ from joblib import dump, load
 
 class MiniBatchKMeansTrainer(object):
 
-    def __init__(self, batch_size = 1440, n_clusters=8, resolution = 0.02, init_info = "k-means++"):
+    def __init__(self, batch_size = 1440, n_clusters=81, resolution = 0.02, init_info = "k-means++"):
         self.plt = plt
         self.resolution = resolution
         self.batch_size = batch_size
-        self.kmeans = self._load_existing_model(n_clusters, np.size(self.batch_size, 0), init_info)
+        self.kmeans = self._load_existing_model(n_clusters, batch_size, init_info)
         self.resolution = resolution
 
     def _load_existing_model(self, n_clusters, batch_size, init_info):

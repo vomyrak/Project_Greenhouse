@@ -56,9 +56,7 @@ class Messenger(object):
             
         print("Connection complete")
         # subscription
-        self.client.subscribe(self.topic + "/average", self.qos)
-        self.client.subscribe(self.topic + "/history", self.qos)
-        self.client.subscribe(self.topic + "/control", self.qos)
+        self.client.subscribe(self.topic + "/#", self.qos)
 
     
     def client_insecure_init(self):

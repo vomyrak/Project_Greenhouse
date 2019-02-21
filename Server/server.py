@@ -37,7 +37,7 @@ class Server(object):
         self.batch_size = batch_size
         self.row_count = 0
         self.kmeans = self._load_kmeans_model()
-        self.mean_setting = self.kmeans.kmeans.cluster_centers_
+        self.mean_setting = self._obtain_optimal_condition()
 
         # Raw data temp storage
         self.buffer_size = buffer_size
@@ -53,6 +53,13 @@ class Server(object):
         self.data = np.zeros(shape=(self.batch_size, 4))
         self.label = np.ndarray(shape=(self.batch_size,), dtype=str)
             
+    def _obtain_optimal_condition(self):
+        optimal = self.db_manager.get_optimal_setting(self.flora)
+        return [(optimal["co2"]["min"] + optimal["co2"]["max"]) / 2,
+                (optimal["tvoc"]["min"] + optimal["tvoc"]["max"]) / 2,
+                (optimal["humidity"]["min"] + optimal["humidity"]["max"]) / 2,
+                (optimal["temperature"]["min"] + optimal["temperature"]["max"]) / 2,
+                ]
 
     def _load_kmeans_model(self):
         '''load or initialise training model'''
