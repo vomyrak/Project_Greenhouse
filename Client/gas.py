@@ -29,7 +29,7 @@ class CCS811(object):
         self.INTERRUPT = 0x08
         self.THRESHOLD = 0x04
 
-        # Range definitions
+        # Valid range definitions
         self.co2_min = 400
         self.co2_max = 8192
         self.tvoc_min = 0
@@ -40,13 +40,16 @@ class CCS811(object):
         self.interrupt = DigitalInputDevice(18)
         
     def reset(self):
+        ''' Reset the sensor to starting condition '''
         self.bus.write_i2c_block_data(self.address, self.RESET, self.RESET_SEQUENCE)
 
     def read_status(self):
+        ''' Read the value of the status register '''
         return self.bus.read_byte_data(self.address, self.STATUS)
   
     def read_result(self):
-        for attempt in range(self.max_retrial_num):
+        ''' Read hardware algorithmic result from then sensor '''
+        for attempt in range(self.max_retrial_num): # Try a few times in case of read failure
             try:
                 while self.interrupt.value == True:
                     time.sleep(0.1)
@@ -61,22 +64,22 @@ class CCS811(object):
     def sensor_init(self):
         self.reset()
         status_OK = False
-        for attempt in range(self.max_retrial_num):
+        for attempt in range(self.max_retrial_num): # Try a few times in case of IO exception
             if status_OK == False:
                 try:
-                    self.bus.write_i2c_block_data(self.address, self.APP_START, [])
+                    self.bus.write_i2c_block_data(self.address, self.APP_START, []) # App startup
                     if self.read_status() & 1:
                         raise AppStartupFailureError()
                     print("Hardware startup complete")
                     
-                    self.bus.write_byte_data(self.address, self.MODE, (self.MODE_1 | self.INTERRUPT))
+                    self.bus.write_byte_data(self.address, self.MODE, (self.MODE_1 | self.INTERRUPT))   # App mode setting to 1 sec / reading
                     if self.read_status() & 1:
                         raise ModeConfigurationFailureError()
                     print("Mode configuration successful")
 
                     status_OK = True
                 except OSError:
-                    if attempt < self.max_retrial_num - 1:
+                    if attempt < self.max_retrial_num - 1: 
                         if self.read_status() & 1:
                             print("Remote I/O Error Happened During Initiation")
                             time.sleep(1)
@@ -84,25 +87,26 @@ class CCS811(object):
                         self.terminate(3)
 
     def convert_result(self):
+        ''' Convert byte reading to actual reading '''
         co2, organic, status, error, raw_data = self.read_result()
         co2 = (co2[0] << 8) + co2[1]
         organic = (organic[0] << 8) + organic[1]
         return co2, organic, status, error, raw_data
 
     def run(self):
-        self.sensor_init()
+        self.sensor_init()  # initialise sensor
 
         iteration_count = 0
         while True:
-            try:
-                iteration_count = iteration_count + 1
-                print("This is the {}th iteration".format(iteration_count))
-                self.convert_result()
-                time.sleep(1)
-            except Exception:
-                a = 0
+            # read result every second
+            iteration_count = iteration_count + 1
+            print("This is the {}th iteration".format(iteration_count))
+            self.convert_result()
+            time.sleep(1)
+
 
     def bus_init(self, bus_index):
+        ''' initialise bus object '''
         try:
             bus = SMBus(bus_index)
             return bus
@@ -110,9 +114,11 @@ class CCS811(object):
             self.terminate(1)
 
     def check_error(self):
+        ''' Verify the content of error '''
         return self.bus.read_byte_data(self.address, self.ERROR)
     
     def terminate(self, error):
+        ''' Terminal the programme when error persists '''
         if error == 1:
             input("Cannot establish bus connection")
         if error == 2:
@@ -123,6 +129,7 @@ class CCS811(object):
 
 
 def main():
+    ''' Testing scripts '''
     sensor = CCS811()
     sensor.run()
 

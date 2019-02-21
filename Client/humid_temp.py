@@ -24,6 +24,7 @@ class SI7021(object):
         self.delay = delay
 
     def bus_init(self, bus_index):
+        ''' initialise bus object '''
         try:
             bus = SMBus(bus_index)
             return bus
@@ -31,6 +32,7 @@ class SI7021(object):
             self.terminate(1)
 
     def run(self):
+        ''' event loop '''
         while True:
             try:
                 self.convert_result()
@@ -38,6 +40,7 @@ class SI7021(object):
                 self.terminate(2)
 
     def convert_result(self):
+        ''' convert result from bytes to actual value '''
         humid, temp = self.read_result()
         raw_humid = (humid[0] << 8) + humid[1]
         raw_temp = (temp[0] << 8) + temp[1]
@@ -46,12 +49,17 @@ class SI7021(object):
         return round(humidity, 1), round(temperature, 1)
 
     def read_result(self):
+        ''' result reading sequence '''
+
+        # humidity
         self.bus.i2c_rdwr(
             i2c_msg.write(self.address, [self.HUMIDITY]))
         time.sleep(self.delay)
         humidity = i2c_msg.read(self.address, 2)
         self.bus.i2c_rdwr(humidity)
         time.sleep(self.delay)
+
+        # temperature
         self.bus.i2c_rdwr(
             i2c_msg.write(self.address, [self.TEMPERATURE]))
         time.sleep(self.delay)
@@ -61,6 +69,8 @@ class SI7021(object):
 
 
     def terminate(self, error):
+
+        # terminate in case of error
         if error == 1:
             input("Cannot establish bus connection")
         else:
@@ -69,6 +79,7 @@ class SI7021(object):
 
 
 def main():
+    ''' testing script '''
     sensor = SI7021()
     sensor.run()
 
