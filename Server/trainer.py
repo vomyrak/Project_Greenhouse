@@ -27,7 +27,8 @@ class MiniBatchKMeansTrainer(object):
     def partial_fit(self, data):
         self.kmeans.partial_fit(data)
         dump(self.kmeans, 'test.joblib')
-            
+    
+    # The following function is adapted from Python Machine Learning by Sebastian Raschka
     def plot_decision_regions(self, data):
         # plot decision regions
         X = data
